@@ -90,6 +90,8 @@ spec:
               type: object
             phase:
               type: string
+            providerID:
+              type: string
             providerStatus:
               type: object
             versions:
