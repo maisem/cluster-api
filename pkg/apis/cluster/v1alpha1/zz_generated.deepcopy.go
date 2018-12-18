@@ -710,6 +710,11 @@ func (in *MachineStatus) DeepCopyInto(out *MachineStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.ProviderID != nil {
+		in, out := &in.ProviderID, &out.ProviderID
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

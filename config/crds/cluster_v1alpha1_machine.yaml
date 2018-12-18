@@ -195,6 +195,8 @@ spec:
               description: Phase represents the current phase of machine actuation.
                 E.g. Pending, Running, Terminating, Failed etc.
               type: string
+            providerID:
+              type: string
             providerStatus:
               description: ProviderStatus details a Provider-specific status. It is
                 recommended that providers maintain their own versioned API types
