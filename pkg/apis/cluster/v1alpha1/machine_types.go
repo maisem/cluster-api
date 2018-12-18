@@ -177,6 +177,11 @@ type MachineStatus struct {
 	// E.g. Pending, Running, Terminating, Failed etc.
 	// +optional
 	Phase *string `json:"phase,omitempty"`
+
+	// ProviderID is the identification ID of the machine provided by the provider.
+	// This field must match the provider ID as seen on the node object corresponding to this machine.
+	// +optional
+	ProviderID *string `json:"providerID,omitempty"`
 }
 
 // LastOperation represents the detail of the last performed operation on the MachineObject.
