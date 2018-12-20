@@ -51,14 +51,9 @@ func (c *ReconcileMachineSet) calculateStatus(ms *v1alpha1.MachineSet, filteredM
 		if templateLabel.Matches(labels.Set(machine.Labels)) {
 			fullyLabeledReplicasCount++
 		}
-		node, err := c.getMachineNode(machine)
-		if err != nil {
-			klog.V(4).Infof("Unable to get node for machine %v, %v", machine.Name, err)
-			continue
-		}
-		if noderefutil.IsNodeReady(node) {
+		if noderefutil.IsMachineReady(machine) {
 			readyReplicasCount++
-			if noderefutil.IsNodeAvailable(node, ms.Spec.MinReadySeconds, metav1.Now()) {
+			if noderefutil.IsMachineAvailable(machine, ms.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
 			}
 		}

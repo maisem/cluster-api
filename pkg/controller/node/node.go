@@ -30,6 +30,7 @@ func (c *Reconciler) link(ctx context.Context, machine *clusterv1.Machine, node 
 	t := metav1.Now()
 	machine.Status.LastUpdated = &t
 	machine.Status.NodeRef = objectRef(node)
+	machine.Status.Conditions = node.Status.Conditions
 	if err := c.Client.Status().Update(ctx, machine); err != nil {
 		klog.Errorf("Error updating machine %s to link node %s: %v\n", machine.ObjectMeta.Name, node.ObjectMeta.Name, err)
 		return err
