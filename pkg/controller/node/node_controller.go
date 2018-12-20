@@ -19,13 +19,18 @@ package node
 import (
 	"context"
 	"sync"
+	"time"
 
+	"github.com/openshift/kubernetes-drain"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
+	"sigs.k8s.io/cluster-api/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -34,18 +39,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const (
+	finalizer = "machines.k8s.io/k8s-node"
+)
+
 // Add creates a new Node Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	return add(mgr, newNodeReconciler(mgr))
 }
 
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *Reconciler {
-	return &Reconciler{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
-		links:  make(map[string]nodeMachineMapping),
+// newNodeReconciler returns a new reconcile.NodeReconciler
+func newNodeReconciler(mgr manager.Manager) *NodeReconciler {
+	return &NodeReconciler{
+		Client:  mgr.GetClient(),
+		kClient: kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		scheme:  mgr.GetScheme(),
+		links:   make(map[string]nodeMachineMapping),
 	}
 }
 
@@ -55,8 +65,8 @@ type nodeMachineMapping struct {
 	machineName types.NamespacedName
 }
 
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *Reconciler) error {
+// add adds a new Controller to mgr with r as the reconcile.NodeReconciler
+func add(mgr manager.Manager, r *NodeReconciler) error {
 	// Create a new controller
 	nc, err := controller.New("node-controller", mgr, controller.Options{Reconciler: reconcile.Func(r.ReconcileNode)})
 	if err != nil {
@@ -79,14 +89,15 @@ func add(mgr manager.Manager, r *Reconciler) error {
 }
 
 // ReconcileNode reconciles a Node object
-type Reconciler struct {
+type NodeReconciler struct {
 	client.Client
-	scheme *runtime.Scheme
-	m      sync.RWMutex
-	links  map[string]nodeMachineMapping
+	kClient *kubernetes.Clientset
+	scheme  *runtime.Scheme
+	m       sync.RWMutex
+	links   map[string]nodeMachineMapping
 }
 
-func (r *Reconciler) ReconcileMachine(request reconcile.Request) (reconcile.Result, error) {
+func (r *NodeReconciler) ReconcileMachine(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the Machine instance
 	m := &clusterv1.Machine{}
 	ctx := context.Background()
@@ -106,13 +117,47 @@ func (r *Reconciler) ReconcileMachine(request reconcile.Request) (reconcile.Resu
 	}
 	id := *m.Status.ProviderID
 	klog.Infof("Reconciling machine %q", id)
+
 	if !m.DeletionTimestamp.IsZero() {
 		klog.Infof("Machine %q deleted, removing link", id)
-		// Nothing to do here, just remove the link.
+		if !util.Contains(m.Finalizers, finalizer) {
+			return reconcile.Result{}, nil
+		}
+		if m.Status.NodeRef != nil {
+			// Drain the node.
+			n, err := r.kClient.CoreV1().Nodes().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					return reconcile.Result{}, err
+				}
+			} else if err := drain.Drain(r.kClient, []*corev1.Node{n}, &drain.DrainOptions{
+				DeleteLocalData:    true,
+				GracePeriodSeconds: 3600,
+				IgnoreDaemonsets:   true,
+				Timeout:            time.Hour,
+			}); err != nil {
+				klog.Infof("Node %q drain failed: %v", id, err)
+			}
+		}
+		klog.Infof("Machine %q removing link", id)
 		r.m.Lock()
 		delete(r.links, id)
 		r.m.Unlock()
+		m.ObjectMeta.Finalizers = util.Filter(m.ObjectMeta.Finalizers, finalizer)
+		if err := r.Client.Update(ctx, m); err != nil {
+			klog.Errorf("Error removing finalizer from machine object %v; %v", m.Name, err)
+			return reconcile.Result{}, err
+		}
 		return reconcile.Result{}, nil
+	}
+	if !util.Contains(m.ObjectMeta.Finalizers, finalizer) {
+		// If object hasn't been deleted and doesn't have a finalizer, add one
+		// Add a finalizer to newly created objects.
+		m.Finalizers = append(m.Finalizers, "machines.k8s.io/k8s-node")
+		if err = r.Update(ctx, m); err != nil {
+			klog.Infof("failed to add finalizer to machine object %v due to error %v.", m.Name, err)
+			return reconcile.Result{}, err
+		}
 	}
 
 	// See if we have already seen the node.
@@ -165,7 +210,7 @@ func (r *Reconciler) ReconcileMachine(request reconcile.Request) (reconcile.Resu
 // and what is in the Node.Spec
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cluster.k8s.io,resources=machines,verbs=get;list;watch;create;update;patch;delete
-func (r *Reconciler) ReconcileNode(request reconcile.Request) (reconcile.Result, error) {
+func (r *NodeReconciler) ReconcileNode(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the node instance
 	node := &corev1.Node{}
 	ctx := context.Background()
