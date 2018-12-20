@@ -26,7 +26,7 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
 
-func (c *Reconciler) link(ctx context.Context, machine *clusterv1.Machine, node *corev1.Node) error {
+func (c *NodeReconciler) link(ctx context.Context, machine *clusterv1.Machine, node *corev1.Node) error {
 	t := metav1.Now()
 	machine.Status.LastUpdated = &t
 	machine.Status.NodeRef = objectRef(node)
@@ -39,7 +39,7 @@ func (c *Reconciler) link(ctx context.Context, machine *clusterv1.Machine, node 
 	return nil
 }
 
-func (c *Reconciler) unlink(ctx context.Context, machine *clusterv1.Machine, node *corev1.Node) error {
+func (c *NodeReconciler) unlink(ctx context.Context, machine *clusterv1.Machine, node *corev1.Node) error {
 	// This machine was linked to a different node, don't unlink them
 	if machine.Status.NodeRef.Name != node.ObjectMeta.Name {
 		klog.Warningf("Node (%v) is tring to unlink machine (%v) which is linked with node (%v).",
