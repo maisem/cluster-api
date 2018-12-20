@@ -211,15 +211,11 @@ func (r *Reconciler) ReconcileNode(request reconcile.Request) (reconcile.Result,
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	if x.nodeName.Name != "" {
-		// This means that we have already linked the machine and node.
-		if !node.DeletionTimestamp.IsZero() {
-			klog.Infof("Node %q is being deleted", id)
-			// We should remove the link if the node goes away.
-			return reconcile.Result{}, r.unlink(ctx, machine, node)
-		}
-		klog.Infof("Machine and node already linked: %q", id)
-		return reconcile.Result{}, nil
+	// This means that we have already linked the machine and node.
+	if !node.DeletionTimestamp.IsZero() {
+		klog.Infof("Node %q is being deleted", id)
+		// We should remove the link if the node goes away.
+		return reconcile.Result{}, r.unlink(ctx, machine, node)
 	}
 	klog.Infof("Linking %q", id)
 	if err := r.link(ctx, machine, node); err != nil {
