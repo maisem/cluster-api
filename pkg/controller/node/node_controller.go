@@ -112,10 +112,10 @@ func (r *NodeReconciler) ReconcileMachine(request reconcile.Request) (reconcile.
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	if m.Status.ProviderID == nil {
+	if m.Spec.ProviderID == nil {
 		return reconcile.Result{}, nil
 	}
-	id := *m.Status.ProviderID
+	id := *m.Spec.ProviderID
 	klog.Infof("Reconciling machine %q", id)
 
 	if !m.DeletionTimestamp.IsZero() {

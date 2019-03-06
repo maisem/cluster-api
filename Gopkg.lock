@@ -83,6 +83,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/go-log/log"
+  packages = ["."]
+  revision = "37e2e1f19306361e1fc152a1839f1236149cb4e4"
+  version = "v0.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/go-logr/logr"
   packages = ["."]
@@ -293,6 +299,12 @@
   ]
   revision = "65fb64232476ad9046e57c26cd0bff3d3a8dc6cd"
   version = "v1.4.3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/openshift/kubernetes-drain"
+  packages = ["."]
+  revision = "c2e51be1758efa30d71a4d30dc4e2db86b70a4df"
 
 [[projects]]
   name = "github.com/pborman/uuid"
@@ -962,6 +974,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "711b882f4abb6d9fa762b577455b653374c9cf636f2b962ba21b26853f372ecd"
+  inputs-digest = "eb31e6ff0e6b90d80c256485b25f10b82f01abd85286794f9ecc7338711719a1"
   solver-name = "gps-cdcl"
   solver-version = 1

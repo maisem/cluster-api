@@ -22,7 +22,7 @@ export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT ?=60s
 export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT ?=60s
 
 # Image URL to use all building/pushing image targets
-export CONTROLLER_IMG ?= gcr.io/k8s-cluster-api/cluster-api-controller:latest
+export CONTROLLER_IMG ?= gcr.io/maisem-gke-dev/cluster-api-controller:latest
 export EXAMPLE_PROVIDER_IMG ?= gcr.io/k8s-cluster-api/example-provider-controller:latest
 
 all: test manager clusterctl
@@ -107,13 +107,12 @@ clean: ## Remove all generated files
 	rm -f bazel-*
 
 .PHONY: docker-build
-docker-build: generate fmt vet manifests ## Build the docker image for controller-manager
+docker-build:
 	docker build . -t ${CONTROLLER_IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i.tmp -e 's@image: .*@image: '"${CONTROLLER_IMG}"'@' ./config/default/manager_image_patch.yaml
 
 .PHONY: docker-push
-docker-push: docker-build ## Push the docker image
 	docker push "$(CONTROLLER_IMG)"
 
 .PHONY: docker-build-ci
